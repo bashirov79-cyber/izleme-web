@@ -85,15 +85,18 @@ function buildOfferPDF(jsPDF, o, A) {
     .replace('{warranty}', o.warranty || L.d_warranty).replace('{delivery}', o.delivery || L.d_delivery).replace('{place}', o.place || L.d_place)
     .replace('{vat}', o.vat_included === false ? L.vat_ex : L.vat_in).replace('{payment}', o.payment || L.d_payment).replace('{until}', offerUntil(o.date, o.valid_days))))
     .concat(o.extra_terms || []);
-  const tailH = 5 + terms.length * 4.4 + 8 + (A.seal ? 12 : 0) + 4 + OFFER_REKV.length * 3.6;
-  if (y + tailH > BOT) { doc.addPage(); y = M; } else y += 5;
+  // rekvizitlər həmişə son səhifənin ən altında; imza-möhür şərtlərdən aralı, ortaya yaxın
+  const RQH = 3.8 + OFFER_REKV.length * 3.6, RQY = PH - 9 - RQH + 3.6, GAP = 16, SH = 32;
+  const tailH = 5 + 5 + terms.length * 4.4 + GAP + SH / 2 + 6;
+  if (y + tailH > RQY) { doc.addPage(); y = M; } else y += 5;
   font('bold', 11, GREEN); doc.text(L.terms_h, M, y); y += 5;
   font('normal', 9.5); for (const t of terms) { doc.text('•  ' + t, M + 1, y); y += 4.4; }
-  y += 3; const sy = y;
-  font('bold', 10.5); doc.text(`${L.dir}:  ${L.name}`, M, y);
-  font('normal', 9.5); doc.text(`________   ${L.seal}`, PW - M, y, { align: 'right' });
-  if (A.seal) { const h = 32, w = h * A.seal.w / A.seal.h; doc.addImage(A.seal.data, 'PNG', PW - M - w - 4, sy - h / 2 - 2, w, h); y += 12; }
-  y += 6;
+  y += GAP; const sy = y;
+  font('bold', 10.5); doc.text(`${L.dir}:  ${L.name}`, M, sy);
+  const sx = PW / 2 + 20;
+  font('normal', 9.5); doc.text(`____________   ${L.seal}`, sx, sy, { align: 'center' });
+  if (A.seal) { const h = SH, w = h * A.seal.w / A.seal.h; doc.addImage(A.seal.data, 'PNG', sx - w / 2 - 4, sy - h / 2 - 1, w, h); }
+  y = RQY;
   font('bold', 7.5, DIM); doc.text(L.req_h, M, y); y += 3.8;
   font('normal', 7.5, DIM); for (const s of OFFER_REKV) { doc.text(s, M, y); y += 3.6; }
   const n = doc.getNumberOfPages();
