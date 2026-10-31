@@ -86,7 +86,7 @@ function buildOfferPDF(jsPDF, o, A) {
     .replace('{vat}', o.vat_included === false ? L.vat_ex : L.vat_in).replace('{payment}', o.payment || L.d_payment).replace('{until}', offerUntil(o.date, o.valid_days))))
     .concat(o.extra_terms || []);
   // rekvizitlər həmişə son səhifənin ən altında; imza-möhür şərtlərdən aralı, ortaya yaxın
-  const RQH = 3.8 + OFFER_REKV.length * 3.6, RQY = PH - 9 - RQH + 3.6, GAP = 16, SH = 43;
+  const RQH = 3.8 + OFFER_REKV.length * 3.6, RQY = PH - 9 - RQH + 3.6, GAP = 16, SH = 41.7;
   const tailH = 5 + 5 + terms.length * 4.4 + GAP + SH / 2 + 6;
   if (y + tailH > RQY) { doc.addPage(); y = M; } else y += 5;
   font('bold', 11, GREEN); doc.text(L.terms_h, M, y); y += 5;
