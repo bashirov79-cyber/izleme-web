@@ -1248,7 +1248,7 @@ const pCmp = (a, b) => azCmp(String(a || '').replace(/^[\s"'“”„«»`]+/, '
 async function viewDocs(params) {
   const t = DOC_T[params.get('t')] ? params.get('t') : 'SQ';
   const q = (params.get('q') || '').replace(/[,()*]/g, ' ').trim();
-  const d1 = params.has('from') ? params.get('from') : (q || t === 'QA' || t === 'QT' ? '' : today().slice(0, 8) + '01');
+  const d1 = params.get('from') || ''; // tarix avtomatik seçilmir — istifadəçi özü seçir
   const d2 = params.get('to') || '';
   const cid = +params.get('c') || null, L = params.get('l') || '';
   const al = await alerts();
