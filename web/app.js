@@ -1644,7 +1644,7 @@ async function viewAccount() {
 }
 
 /* ---------- Qiymət təklifləri (anbar, borc və qaimələrə təsir etmir) ---------- */
-const OFFER_ST = { qaralama: ['Qaralama', 't-blue'], tesdiq: ['Təsdiqlənib · imzalı', 't-ok'], legv: ['Ləğv edilib', 't-grey'] };
+const OFFER_ST = { qaralama: ['Aktiv', 't-ok'], tesdiq: ['Aktiv', 't-ok'], legv: ['Ləğv edilib', 't-grey'] };
 const OFFER_PH = { az: { unit: 'əd', d_delivery: '15 iş günüdür', d_payment: 'Razılaşma yolu ilə', d_warranty: '1 ildir', d_place: 'Bakı şəhəri' },
   en: { unit: 'pcs', d_delivery: '15 working days', d_payment: 'by agreement', d_warranty: '1 year', d_place: 'Baku' } };
 const OFFER_DEF = () => ({ id: null, no: null, status: 'qaralama', offer_date: today(), customer_id: null, customer_name: '', lang: 'az', currency: 'AZN', vat_included: true,
@@ -1673,7 +1673,7 @@ async function storeImage(blob, src) {
 async function viewOffers(params) {
   const f = params.get('f') || 'hamisi'; const q = (params.get('q') || '').replace(/[,()*%]/g, ' ').trim();
   let qb = sb.from('offers').select('id,no,offer_date,customer_name,status,groups,created_by,created_at,currency,lang').order('offer_date', { ascending: false }).order('id', { ascending: false }).limit(300);
-  if (f !== 'hamisi') qb = qb.eq('status', f);
+  if (f === 'aktiv') qb = qb.neq('status', 'legv'); else if (f === 'legv') qb = qb.eq('status', 'legv');
   if (q) qb = qb.or(`no.ilike.*${q}*,customer_name.ilike.*${q}*`);
   const [{ data, error }, al] = await Promise.all([qb, alerts()]); if (error) throw error;
   const hq = o => '#teklifler?' + new URLSearchParams(Object.fromEntries(Object.entries({ f, q, ...o }).filter(([, v]) => v && v !== 'hamisi')));
@@ -1682,7 +1682,7 @@ async function viewOffers(params) {
     <div class="head"><div><h1>Qiymət təklifləri</h1><div class="sub">${data.length} təklif · anbar və borclara təsir etmir</div></div><a class="btn p" href="#teklif/yeni">+ Yeni təklif</a></div>
     <div class="fgrid" style="align-items:end"><label class="f" style="grid-column:span 2">Müştəri və ya təklif №<input class="inp" id="q" type="search" value="${esc(q)}" placeholder="Ad və ya MG-2026-…"></label>
       <div class="row"><button class="btn p" id="go">Göstər</button>${q ? `<a class="btn" href="${hq({ q: '' })}">Təmizlə</a>` : ''}</div></div>
-    <div class="chips">${[['hamisi', 'Hamısı'], ['qaralama', 'Qaralama'], ['tesdiq', 'Təsdiqlənib'], ['legv', 'Ləğv edilən']].map(([k, l]) => `<a class="chip ${k === f ? 'on' : ''}" href="${hq({ f: k })}">${l}</a>`).join('')}</div>
+    <div class="chips">${[['hamisi', 'Hamısı'], ['aktiv', 'Aktiv'], ['legv', 'Ləğv edilən']].map(([k, l]) => `<a class="chip ${k === f ? 'on' : ''}" href="${hq({ f: k })}">${l}</a>`).join('')}</div>
     <section class="card tight"><div class="list">${data.map(o => `<a class="li" href="#teklif/${o.id}"><span class="m"><span class="d"><b>${esc(o.no)}</b> · ${dtfmt(o.offer_date, o.created_at)} · ${esc((o.created_by || '').replace('@medigroup.az', ''))}${o.lang === 'en' ? ' · EN' : ''}</span><span class="t">${esc(o.customer_name || '—')}</span></span>
       <span class="r"><span class="tag ${OFFER_ST[o.status][1]}">${OFFER_ST[o.status][0]}</span><span class="d">${cnt(o)} məhsul · ${esc(o.currency)}</span></span></a>`).join('') || '<div class="empty">Təklif yoxdur</div>'}</div></section>`, al);
   const go = () => location.hash = hq({ q: document.getElementById('q').value.trim() });
