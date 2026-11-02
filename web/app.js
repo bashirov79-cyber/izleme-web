@@ -244,8 +244,7 @@ async function viewPanel() {
     ...red.slice(0, 5).map(x => `<a class="li" href="#mehsul/${x.id}"><span class="dotc" style="background:var(--red-bar)"></span><span class="m"><span class="t">${esc(x.name)}</span><span class="d">${qtyf(x.qty)} / ${qtyf(x.base_qty)} ${esc(x.unit)} · ${x.pct}%${x.days_left != null ? ` · ~${x.days_left} günə bitər` : ''}</span></span></a>`)
   ].join('');
   mount('panel', `
-    <div class="head"><div><h1>Panel</h1><div class="sub">${esc(d)}</div></div>
-      <div class="row"><a class="btn" href="#teklifler">Qiymət təklifi</a><a class="btn" href="#odenis-yeni">+ Ödəniş</a><a class="btn" href="#medaxil">+ Mal mədaxili</a><a class="btn p" href="#yeni-sifaris">+ Yeni sifariş</a></div></div>
+    <div class="head"><div><h1>Panel</h1><div class="sub">${esc(d)}</div></div></div>
     <div class="kpis">
       <a class="kpi brand" href="#sifarisler"><span class="l">Keçirilməmiş sifarişlər</span><span class="v">${orders?.length || 0}</span><span class="s">qaralama</span></a>
       <a class="kpi ${overdue >= 1 ? 'red' : ''}" href="#odenisler"><span class="l">Gecikən ödəniş</span><span class="v">${money0(overdue)}</span><span class="s">${late.length} müştəri · cəmi alınacaq ${money0(recv)}</span></a>
