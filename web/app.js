@@ -1757,9 +1757,7 @@ async function viewOffer(id, params) {
       <div id="groups">${groupsHTML()}</div>
       ${ro ? '' : '<div><button type="button" class="btn" id="addg">+ Yeni sorğu (başqa məhsul)</button></div>'}
       <div class="obar">${ro ? '' : '<button class="btn" id="save">Yadda saxla</button>'}
-        <button class="btn p" id="pdf">${ico('print', 18)} PDF yüklə</button>
-        ${isAdmin() && o.id && !ro ? (o.status === 'tesdiq' ? '<button class="btn" id="unappr">Təsdiqi götür</button>' : '<button class="btn" id="appr">Təsdiq et · imza və möhür</button>') : ''}</div>
-      ${!isAdmin() && o.status !== 'tesdiq' && !ro ? '<div class="note">PDF imzasız çıxır. İmza və möhür rəhbər «Təsdiq et» basandan sonra əlavə olunur. Təsdiqdən sonra dəyişiklik edilsə, təsdiq düşür.</div>' : ''}`, al);
+        <button class="btn p" id="pdf">${ico('print', 18)} PDF yüklə</button></div>`, al);
     bind();
   }
   const itemOf = k => { const [g, i] = k.split('-').map(Number); return o.groups[g].items[i]; };
@@ -1857,19 +1855,19 @@ async function offerPDF(o) {
   const ids = o.groups.flatMap(g => g.items.map(i => i.img)).filter(Boolean); await offerImgs(ids);
   const img = {}; ids.forEach(id => { const r = imgCache.get(id); if (r) img[id] = { data: `data:${r.mime};base64,${r.data}`, w: r.w, h: r.h, fmt: r.mime === 'image/png' ? 'PNG' : 'JPEG' }; });
   let seal = null;
-  if (o.status === 'tesdiq') { const { data, error } = await sb.rpc('offer_seal', { p_offer: o.id }); if (error) throw error; if (data) seal = { data: `data:${data.mime};base64,${data.data}`, w: data.w, h: data.h }; }
+  if (o.status !== 'legv') { const { data, error } = await sb.rpc('offer_seal', { p_offer: o.id || null }); if (error) throw error; if (data) seal = { data: `data:${data.mime};base64,${data.data}`, w: data.w, h: data.h }; }
   const extra = (o.extra_terms || '').split('\n').map(s => s.trim()).filter(Boolean);
   const doc = buildOfferPDF(window.jspdf.jsPDF, { ...o, number: o.no, date: o.offer_date, customer: o.customer_name, extra_terms: extra }, { ...libs, img, seal });
   const safe = (o.customer_name || 'müştəri').replace(/[\\/:*?"<>|]+/g, ' ').trim();
   doc.save(`Medigroup teklif - ${safe} (${o.no}).pdf`);
-  if (o.status === 'tesdiq' && !seal) toast('PDF yükləndi. İmza və möhür şəkli hələ qoyulmayıb (Hesab bölməsi)', true); else toast('PDF yükləndi');
+  if (o.status !== 'legv' && !seal) toast('PDF yükləndi. İmza və möhür şəkli hələ qoyulmayıb (Hesab bölməsi)', true); else toast('PDF yükləndi');
 }
 // rəhbər: imza və möhür şəkli (Hesab səhifəsində)
 async function sealCard() {
   if (!isAdmin()) return '';
   const { data } = await sb.rpc('offer_seal', { p_offer: null });
   return `<section class="card"><h2>Təklif üçün imza və möhür</h2>
-    <div class="note">İmzanızla möhürün birlikdə olduğu şəkil (şəffaf fonlu PNG ən yaxşısıdır; ağ kağızda skan da olar). Yalnız siz «Təsdiq et» basdığınız təkliflərin PDF-inə qoyulur.</div>
+    <div class="note">İmzanızla möhürün birlikdə olduğu şəkil (şəffaf fonlu PNG ən yaxşısıdır; ağ kağızda skan da olar). Bütün istifadəçilərin hazırladığı təkliflərin PDF-inə avtomatik qoyulur (ləğv edilənlərdən başqa).</div>
     ${data ? `<div><img src="data:${data.mime};base64,${data.data}" alt="İmza və möhür" style="max-height:110px;max-width:100%;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/16px 16px;border-radius:8px"></div>` : '<div class="warnbox">Hələ qoyulmayıb</div>'}
     <div class="row"><label class="btn p">${data ? 'Dəyiş' : 'Şəkil seç'}<input type="file" id="sealf" accept="image/png,image/jpeg" data-az="1" hidden></label>${data ? '<button type="button" class="btn danger" id="sealdel">Sil</button>' : ''}</div></section>`;
 }
