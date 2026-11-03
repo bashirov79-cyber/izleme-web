@@ -735,21 +735,60 @@ function stockRow(x) {
 }
 
 async function viewProduct(id) {
-  const [p, { data: moves }, al] = await Promise.all([loadProducts(), sb.from('stock_moves').select('*').eq('product_id', id).order('moved_at', { ascending: false }).limit(200), alerts()]);
+  const [p, { data: moves }, sl, pl, cust, al] = await Promise.all([loadProducts(),
+    sb.from('stock_moves').select('*').eq('product_id', id).order('moved_at', { ascending: false }).limit(500),
+    fetchAll(() => sb.from('sales_lines').select('sale_date,doc,customer_id,qty,amount').eq('product_id', id).order('id')),
+    fetchAll(() => sb.from('purchase_lines').select('purchase_date,doc,supplier_id,qty,amount').eq('product_id', id).order('id')),
+    loadCustomers(), alerts()]);
   const x = p.find(y => y.id === +id); if (!x) throw new Error('Məhsul tapılmadı');
   const reorder = x.base_qty ? Math.max(0, x.base_qty - x.qty) : null;
+  // hər hərəkəti öz sənəd sətri ilə tutuşdur (kontragent, qiymət, sənədə keçid)
+  const cname = new Map(cust.map(c => [c.id, c.name]));
+  const lines = [...sl.map(r => ({ tb: 's', day: r.sale_date, doc: r.doc, pid: r.customer_id, qty: +r.qty, amount: +r.amount })),
+    ...pl.map(r => ({ tb: 'p', day: r.purchase_date, doc: r.doc, pid: r.supplier_id, qty: +r.qty, amount: +r.amount }))];
+  const used = new Set(), KT = { satis: ['s', 1], qaytarma_alici: ['s', -1], medaxil: ['p', 1], qaytarma_tedarukcu: ['p', -1] };
+  const bday = t => new Date(new Date(t).getTime() + 4 * 3600e3).toISOString().slice(0, 10);
+  const match = m => {
+    const k = KT[m.kind]; if (!k) return null;
+    const days = [String(m.moved_at).slice(0, 10), bday(m.moved_at)], q = Math.abs(+m.qty);
+    const ok = l => l.tb === k[0] && Math.sign(l.qty) === k[1];
+    const tries = [l => ok(l) && l.doc === m.doc && days.includes(l.day), l => ok(l) && l.doc === m.doc, l => ok(l) && days.includes(l.day) && Math.abs(l.qty) === q, l => ok(l) && days.includes(l.day)];
+    for (const f of tries) { const i = lines.findIndex((l, j) => !used.has(j) && f(l)); if (i >= 0) { used.add(i); return lines[i]; } }
+    return null;
+  };
+  const rows = (moves || []).map(m => {
+    const l = match(m), typ = l ? (l.tb === 's' ? (l.qty > 0 ? 'SQ' : 'QA') : (l.qty > 0 ? 'AQ' : 'QT')) : null;
+    const pid = l ? l.pid : m.partner_id, price = l && l.qty ? Math.abs(l.amount / l.qty) : m.unit_price != null ? +m.unit_price : null;
+    return { m, l, typ, pid, price, amount: l ? Math.abs(l.amount) : price != null ? Math.abs(price * m.qty) : null,
+      grp: m.kind === 'medaxil' ? 'alis' : m.kind === 'satis' ? 'satis' : /^qaytarma/.test(m.kind) ? 'qaytarma' : 'diger' };
+  });
+  const buys = rows.filter(r => r.grp === 'alis'), sells = rows.filter(r => r.grp === 'satis');
+  const sumq = a => a.reduce((t, r) => t + Math.abs(+r.m.qty), 0);
+  const lastTxt = r => r ? `son: ${dfmt(r.m.moved_at)}${r.pid ? ' · ' + esc(cname.get(r.pid) || '') : ''}${r.price != null ? ' · ' + money(r.price) : ''}` : '';
+  const cell = r => {
+    const dn = r.l ? r.l.doc : r.m.doc || '';
+    return r.typ ? `<a href="${docHref({ typ: r.typ, doc: r.l.doc, yr: r.l.day.slice(0, 4), partner_id: r.pid })}">${esc(dn)}</a>` : esc(dn);
+  };
   mount('anbar', `<a class="back" href="#anbar">${ico('back', 16)} Anbar</a>
     <div class="head"><div><h1>${esc(x.name)}</h1><div class="sub">kod ${esc(x.code ?? '—')}${x.article ? ' · artikul ' + esc(x.article) : ''} · ${esc(x.kind)}</div></div>${stockTag(x)}</div>
     ${x.needs_check ? `<div class="warnbox">${esc(x.note || '1C-də bu adla bir neçə məhsul var — qalığı yoxlayın.')}</div>` : ''}
     <div class="kpis">
       <div class="kpi ${x.status === 'qirmizi' ? 'red' : ''}"><span class="l">Qalıq</span><span class="v">${qtyf(x.qty)} ${esc(x.unit)}</span><span class="s">${x.pct != null ? x.pct + '% son mədaxildən' : ''}</span></div>
-      <div class="kpi"><span class="l">100% (son mədaxildən sonra)</span><span class="v">${x.base_qty != null ? qtyf(x.base_qty) : '—'}</span><span class="s">${x.base_date ? dfmt(x.base_date) : 'mədaxil tarixi yoxdur'}</span></div>
+      <div class="kpi"><span class="l">Alış · ${buys.length} dəfə</span><span class="v">${qtyf(sumq(buys))}</span><span class="s">${lastTxt(buys[0])}</span></div>
+      <div class="kpi"><span class="l">Satış · ${sells.length} dəfə</span><span class="v">${qtyf(sumq(sells))}</span><span class="s">${lastTxt(sells[0])}</span></div>
       <div class="kpi"><span class="l">Son 12 ayda satış</span><span class="v">${qtyf(x.sold_12m)}</span><span class="s">${x.days_left != null ? `~${x.days_left} günə bitər` : ''}</span></div>
     </div>
     <div class="row"><a class="btn p" href="#medaxil?p=${x.id}">+ Mal mədaxili${reorder ? ` (${qtyf(reorder)} lazımdır)` : ''}</a></div>
-    <section class="card tight"><div class="card" style="border:0;padding-bottom:6px"><h2>Hərəkətlər</h2></div><div class="scroll"><table class="t"><thead><tr><th>Tarix</th><th>Növ</th><th>Sənəd</th><th class="n">Miqdar</th></tr></thead><tbody>
-      ${(moves || []).map(m => `<tr><td>${m.kind === 'duzelis' || (m.doc && !/^MGP/.test(m.doc)) ? dtfmt(m.moved_at, m.moved_at) : dfmt(m.moved_at)}</td><td>${MOVE[m.kind] || m.kind}${m.note && m.kind === 'duzelis' ? `<div class="note">${esc(m.note)}</div>` : ''}</td><td>${esc(m.doc || '')}</td><td class="n amt" style="color:${m.qty > 0 ? 'var(--ok)' : 'var(--ink)'}">${m.qty > 0 ? '+' : ''}${qtyf(m.qty)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Hərəkət yoxdur</td></tr>'}
-    </tbody></table></div></section>`, al);
+    <section class="card tight"><div class="card" style="border:0;padding-bottom:6px"><h2>Hərəkətlər</h2>
+      <div class="chips" id="mvf">${[['hamisi', 'Hamısı'], ['alis', 'Alış'], ['satis', 'Satış'], ['qaytarma', 'Qaytarma']].map(([k, l], i) => `<a class="chip ${i ? '' : 'on'}" href="javascript:void 0" data-g="${k}">${l}</a>`).join('')}</div></div>
+      <div class="scroll"><table class="t"><thead><tr><th>Tarix</th><th>Növ</th><th>Sənəd</th><th>Kimdən / kimə</th><th class="n">Miqdar</th><th class="n">Qiymət</th><th class="n">Məbləğ</th></tr></thead><tbody>
+      ${rows.map(r => { const m = r.m; return `<tr data-g="${r.grp}"><td>${m.kind === 'duzelis' || (m.doc && !/^MGP/.test(m.doc)) ? dtfmt(m.moved_at, m.moved_at) : dfmt(m.moved_at)}</td><td>${MOVE[m.kind] || m.kind}${m.note && m.kind === 'duzelis' ? `<div class="note">${esc(m.note)}</div>` : ''}</td><td>${cell(r)}</td><td>${r.pid ? `<a href="#musteri/${r.pid}">${esc(cname.get(r.pid) || '—')}</a>` : '—'}</td><td class="n amt" style="color:${m.qty > 0 ? 'var(--ok)' : 'var(--ink)'}">${m.qty > 0 ? '+' : ''}${qtyf(m.qty)}</td><td class="n">${r.price != null ? money(r.price) : ''}</td><td class="n">${r.amount != null ? money(r.amount) : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">Hərəkət yoxdur</td></tr>'}
+    </tbody></table></div></section>
+    <div class="note">Sənəd nömrəsinə basın — sənəd açılır; firma adına basın — firmanın kartı açılır. Qiymət sənəddəki kimidir: 1C-də 0,01 ₼ ilə vurulmuş alışlar burada da 0,01 ₼ görünür.</div>`, al);
+  document.querySelectorAll('#mvf .chip').forEach(c => c.onclick = () => {
+    document.querySelectorAll('#mvf .chip').forEach(z => z.classList.toggle('on', z === c));
+    document.querySelectorAll('tr[data-g]').forEach(tr => { tr.style.display = c.dataset.g === 'hamisi' || tr.dataset.g === c.dataset.g ? '' : 'none'; });
+  });
 }
 
 async function viewNewProduct() {
