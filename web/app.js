@@ -266,7 +266,8 @@ function orderRow(o) {
 /* ---------- SİFARİŞLƏR ---------- */
 async function viewOrders(params) {
   const f = params.get('f') || 'hamisi'; const q = params.get('q') || ''; const d1 = params.get('from') || ''; const d2 = params.get('to') || '';
-  if (f === '1c') return viewOrders1C(f, q, d1, d2);
+  const L = params.get('l') || '', cid = +params.get('c') || null;
+  if (f === '1c') return viewOrders1C(f, q, d1, d2, L, cid);
   let qb = sb.from('v_orders').select('*').order('created_at', { ascending: false }).limit(500);
   if (f === 'qaralama') qb = qb.in('status', ['teklif', 'tesdiq', 'sifaris']);
   else if (f === 'hamisi') qb = qb.neq('status', 'legv');
@@ -274,9 +275,10 @@ async function viewOrders(params) {
   if (d1) qb = qb.gte('order_date', d1);
   if (d2) qb = qb.lte('order_date', d2);
   const [{ data, error }, al] = await Promise.all([qb, alerts()]); if (error) throw error;
-  const rows = (data || []).filter(o => !q || norm(o.customer_name + ' ' + o.no).includes(norm(q)));
+  const hq = o => '#sifarisler?' + new URLSearchParams(Object.fromEntries(Object.entries({ f, q, from: d1, to: d2, l: L, c: cid || '', ...o }).filter(([, v]) => v))).toString();
+  const lf = letterFilter((data || []).filter(o => !q || norm(o.customer_name + ' ' + o.no).includes(norm(q))), L, cid, hq);
+  const rows = lf.data;
   const total = rows.filter(o => o.status !== 'legv').reduce((s, o) => s + Number(o.total), 0);
-  const hq = o => '#sifarisler?' + new URLSearchParams(Object.fromEntries(Object.entries({ f, q, from: d1, to: d2, ...o }).filter(([, v]) => v))).toString();
   const chips = ORDER_CHIPS;
   mount('sifarisler', `
     <div class="head"><div><h1>Sifarişlər</h1><div class="sub">${rows.length} sifariş · cəmi ${money0(total)}</div></div><a class="btn p" href="#yeni-sifaris">+ Yeni sifariş</a></div>
@@ -284,26 +286,39 @@ async function viewOrders(params) {
       <label class="f" style="grid-column:span 2">Müştəri və ya nömrə<input class="inp" id="q" type="search" placeholder="Ad yazın…" value="${esc(q)}"></label>
       <label class="f">Tarixdən<input class="inp" type="date" id="d1" value="${d1}"></label>
       <label class="f">Tarixədək<input class="inp" type="date" id="d2" value="${d2}"></label>
-      <div class="row"><button class="btn p" id="go">Göstər</button>${q || d1 || d2 ? `<a class="btn" href="#sifarisler?f=${f}">Təmizlə</a>` : ''}</div>
+      <div class="row"><button class="btn p" id="go">Göstər</button>${q || d1 || d2 || L ? `<a class="btn" href="#sifarisler?f=${f}">Təmizlə</a>` : ''}</div>
     </div>
-    <div class="chips">${chips.map(([k, l]) => `<a class="chip ${k === f ? 'on' : ''}" href="${hq({ f: k })}">${l}</a>`).join('')}</div>
+    <div class="chips">${chips.map(([k, l]) => `<a class="chip ${k === f ? 'on' : ''}" href="${hq({ f: k, l: '', c: '' })}">${l}</a>`).join('')}</div>
+    ${lf.html}
     <section class="card tight"><div class="list">${rows.map(orderRow).join('') || '<div class="empty">Sifariş yoxdur</div>'}</div></section>`, al);
   const go = () => location.hash = hq({ q: document.getElementById('q').value.trim(), from: document.getElementById('d1').value, to: document.getElementById('d2').value });
   document.getElementById('go').onclick = go; document.getElementById('q').onkeydown = e => { if (e.key === 'Enter') go(); };
 }
 
+// əlifba filtri (Sənədlər bölməsindəki kimi): hərf → həmin hərflə başlayan firmalar → firma
+function letterFilter(all, L, cid, hq, amt) {
+  const has = new Set(all.map(x => pLetter(x.customer_name)));
+  const byL = L ? all.filter(x => pLetter(x.customer_name) === L) : all;
+  const data = cid ? byL.filter(x => x.customer_id === cid) : byL;
+  const m = new Map(); if (L) byL.forEach(x => { const k = x.customer_id ?? 'x'; const f = m.get(k) || { id: x.customer_id, name: x.customer_name || '—', n: 0 }; f.n++; m.set(k, f); });
+  const firms = [...m.values()].sort((a, b) => pCmp(a.name, b.name));
+  const html = `<div class="letters"><a href="${hq({ l: '', c: '' })}" class="${!L ? 'on' : ''}">Hamısı</a>${[...AZ_LETTERS, '#'].filter(c => has.has(c)).map(c => `<a href="${hq({ l: c, c: '' })}" class="${c === L ? 'on' : ''}">${c}</a>`).join('')}</div>
+    ${L ? `<div class="chips">${firms.map(f => `<a class="chip ${f.id === cid ? 'on' : ''}" href="${hq({ c: f.id === cid ? '' : (f.id ?? '') })}">${esc(f.name)} · ${f.n}</a>`).join('')}</div>` : ''}`;
+  return { data, html };
+}
 const ORDER_CHIPS = [['hamisi', 'Hamısı'], ['qaralama', 'Qaralama'], ['catdirildi', 'Qaimə keçirilib'], ['legv', 'Ləğv edilən'], ['1c', '1C arxivi (2023–16.10.2026)']];
 // 1C-dən köçürülmüş alıcı sifarişləri — yalnız baxış; anbar və borca təsir etmir
-async function viewOrders1C(f, q, d1, d2) {
+async function viewOrders1C(f, q, d1, d2, L, cid) {
   const qq = q.replace(/[,()*]/g, ' ').trim();
-  const [data, al] = await Promise.all([fetchAll(() => {
+  const [all, al] = await Promise.all([fetchAll(() => {
     let qb = sb.from('orders_1c').select('*').order('order_date', { ascending: false }).order('doc', { ascending: false });
     if (d1) qb = qb.gte('order_date', d1); if (d2) qb = qb.lte('order_date', d2);
     if (qq) qb = qb.or(`customer_name.ilike.*${qq}*,doc.ilike.*${qq}*,invoice_doc.ilike.*${qq}*`);
     return qb;
   }), alerts()]);
+  const hq = o => '#sifarisler?' + new URLSearchParams(Object.fromEntries(Object.entries({ f, q, from: d1, to: d2, l: L, c: cid || '', ...o }).filter(([, v]) => v))).toString();
+  const lf = letterFilter(all, L, cid, hq), data = lf.data;
   const sum = data.reduce((t, o) => t + Number(o.amount), 0), linked = data.filter(o => o.invoice_doc).length;
-  const hq = o => '#sifarisler?' + new URLSearchParams(Object.fromEntries(Object.entries({ f, q, from: d1, to: d2, ...o }).filter(([, v]) => v))).toString();
   const row = o => { const inv = '#sifaris1c/' + o.id;
     return `<${inv ? `a href="${inv}"` : 'div'} class="li"><span class="m"><span class="d"><b>${esc(o.doc)}</b> · ${dfmt(o.order_date)} <span class="tag t-grey">1C</span></span><span class="t">${esc(o.customer_name)}</span></span>
       <span class="r"><span class="amt">${money(o.amount)}</span>${o.invoice_doc ? `<span class="tag t-ok">qaimə ${esc(o.invoice_doc)} · ${dfmt(o.invoice_date)}</span>` : '<span class="tag t-grey">qaiməsiz</span>'}</span></${inv ? 'a' : 'div'}>`; };
@@ -314,9 +329,10 @@ async function viewOrders1C(f, q, d1, d2) {
       <label class="f" style="grid-column:span 2">Müştəri, sifariş və ya qaimə №<input class="inp" id="q" type="search" placeholder="Ad və ya nömrə yazın…" value="${esc(q)}"></label>
       <label class="f">Tarixdən<input class="inp" type="date" id="d1" value="${d1}"></label>
       <label class="f">Tarixədək<input class="inp" type="date" id="d2" value="${d2}"></label>
-      <div class="row"><button class="btn p" id="go">Göstər</button>${q || d1 || d2 ? `<a class="btn" href="#sifarisler?f=1c">Təmizlə</a>` : ''}</div>
+      <div class="row"><button class="btn p" id="go">Göstər</button>${q || d1 || d2 || L ? `<a class="btn" href="#sifarisler?f=1c">Təmizlə</a>` : ''}</div>
     </div>
-    <div class="chips">${ORDER_CHIPS.map(([k, l]) => `<a class="chip ${k === f ? 'on' : ''}" href="${hq({ f: k })}">${l}</a>`).join('')}</div>
+    <div class="chips">${ORDER_CHIPS.map(([k, l]) => `<a class="chip ${k === f ? 'on' : ''}" href="${hq({ f: k, l: '', c: '' })}">${l}</a>`).join('')}</div>
+    ${lf.html}
     <div class="note">1C-dən köçürülmüş alıcı sifarişləri (yalnız baxmaq üçün): məhsullar, göndərilən və qalan miqdar, bağlı satış qaiməsi. Anbar qalığına və borclara təsir etmir.</div>
     <section class="card tight"><div class="list">${data.slice(0, lim).map(row).join('') || '<div class="empty">Sifariş tapılmadı</div>'}</div>
     ${data.length > lim ? `<div class="more"><button class="btn sm" id="more">Daha çox (${data.length - lim})</button></div>` : ''}</section>`, al);
