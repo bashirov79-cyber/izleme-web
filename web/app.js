@@ -996,7 +996,7 @@ async function viewCustomer(id) {
   try { const g = $app.querySelector('.grid2'); if (g) { const w = document.createElement('div'); w.style.cssText = 'display:flex;flex-direction:column;gap:16px'; w.innerHTML = await custDocsHTML(x.id); g.after(w); bindCustDocs(x.id); } } catch (e) { console.error(e); }
 }
 
-const NEWC_REQ = [['signer_pos', 'İmza edənin vəzifəsi', 'Direktor'], ['signer_short', 'İmza edən (qısa)', 'Soyad Ad'], ['signer_full', 'İmza edən (tam)', 'Soyad Ad Ata adı oğlu/qızı'],
+const NEWC_REQ = [['signer_pos', 'İmza edənin vəzifəsi', 'Direktor'], ['signer_full', 'İmza edən (tam: soyad, ad, ata adı)', 'Soyad Ad Ata adı oğlu/qızı'],
   ['bank', 'Bank və filial'], ['iban', 'H/H (IBAN)'], ['corr_account', 'M/H'], ['bank_code', 'Bank kodu'], ['bank_voen', 'Bankın VÖEN-i'], ['swift', 'SWIFT'], ['legal_address', 'Hüquqi ünvan', '', 1]];
 async function viewNewCustomer() {
   const al = await alerts();
@@ -1951,8 +1951,8 @@ const loadDocLibs = () => docLibs ||= (async () => {
   const js = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('Sənəd modulu yüklənmədi, internetinizi yoxlayın')); document.head.append(s); });
   if (!window.PizZip) await js('https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.min.js');
   if (!window.docxtemplater) await js('https://cdn.jsdelivr.net/npm/docxtemplater@3.47.4/build/docxtemplater.js');
-  if (typeof contractTexts === 'undefined') await js('docdata.js?v=2');
-  if (typeof DOCX_DOCS === 'undefined') await js('sablonlar.js?v=2');
+  if (typeof contractTexts === 'undefined') await js('docdata.js?v=3');
+  if (typeof DOCX_DOCS === 'undefined') await js('sablonlar.js?v=3');
 })().catch(e => { docLibs = null; throw e; });
 let pdfLibs = null;
 const loadPdfLibs = () => pdfLibs ||= (async () => {
@@ -1983,7 +1983,7 @@ async function outputDoc(tpl, data, name, fmt) {
   toast('Fayl yükləndi');
 }
 async function custRec(id) { const { data, error } = await sb.from('customers').select('*').eq('id', id).single(); if (error) throw error; return data; }
-const reqMissing = c => ['voen', 'bank', 'iban', 'signer_short'].filter(k => !(c[k] || '').trim()).map(k => ({ voen: 'VÖEN', bank: 'bank', iban: 'H/H', signer_short: 'imza edən şəxs' })[k]);
+const reqMissing = c => ['voen', 'bank', 'iban', 'signer_full'].filter(k => !(c[k] || (k === 'signer_full' ? c.signer_short : '') || '').trim()).map(k => ({ voen: 'VÖEN', bank: 'bank', iban: 'H/H', signer_full: 'imza edən şəxs' })[k]);
 
 // ---- mənbədən sətirlər: sifariş, 1C/tətbiq satış qaiməsi, qiymət təklifi, müqavilə ----
 async function linesFromSource(params) {
@@ -2281,7 +2281,7 @@ async function custDocsHTML(id) {
       <div class="fgrid">
         ${F('doc_name', 'Sənəddə ad', cu.name)}${F('doc_name_gen', 'Yiyəlik hal (…-nin)', '(avtomatik)')}
         ${F('signer_pos', 'İmza edənin vəzifəsi', 'Direktor')}${F('signer_pos_gen', 'Vəzifə (…-su/-si)', '(avtomatik)')}
-        ${F('signer_short', 'İmza edən (qısa)', 'Soyad Ad')}${F('signer_full', 'İmza edən (tam)', 'Soyad Ad Ata adı oğlu/qızı')}
+        ${F('signer_full', 'İmza edən (tam: soyad, ad, ata adı)', 'Soyad Ad Ata adı oğlu/qızı')}
         ${F('bank', 'Bank və filial')}${F('iban', 'H/H (IBAN)')}${F('corr_account', 'M/H')}${F('bank_code', 'Bank kodu')}${F('bank_voen', 'Bankın VÖEN-i')}${F('swift', 'SWIFT')}
         <label class="f" style="grid-column:1/-1">Hüquqi ünvan<input class="inp" data-k="legal_address" value="${esc(cu.legal_address || '')}"></label></div>
       <div class="row"><button class="btn" id="savec2">Yadda saxla</button></div></section>
@@ -2292,6 +2292,7 @@ function bindCustDocs(id) {
   const b = document.getElementById('savec2'); if (!b) return;
   b.onclick = async () => {
     const upd = {}; b.closest('section').querySelectorAll('[data-k]').forEach(e => upd[e.dataset.k] = e.value.trim() || null);
+    if (upd.signer_full) upd.signer_short = upd.signer_full.split(/\s+/).slice(0, 2).join(' ');
     const { error } = await sb.from('customers').update(upd).eq('id', id); if (error) return fail(error);
     toast('Rekvizitlər yadda saxlanıldı');
   };

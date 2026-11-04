@@ -57,15 +57,27 @@ function docRows(rows, vat) {
   const w = docMoneyWords(total);
   return { rows: out, vat: !!vat, sum: fmt2(sum), vat_amt: fmt2(r2d(total - sum)), total: fmt2(total), total_words: w, total_words_lc: w.replace(/^./, c => c.toLocaleLowerCase('az')), _total: total };
 }
+// firma adını dırnağa al: «Leyla Medical Center MMC» → «“Leyla Medical Center” MMC»; f/ş «Ad» → f/ş “Ad”
+// adda artıq dırnaq varsa toxunulmur
+const LEGAL_FORMS = ['MMC', 'ASC', 'QSC', 'AASC', 'ATSC', 'PHŞ', 'PŞ', 'İB', 'İctimai Birliyi', 'MTK', 'LLC', 'LTD', 'Ltd', 'Ltd.', 'LTD.', 'Co.,LTD', 'CO.,LTD', 'A.Ş', 'A.Ş.', 'OOO', 'QSC.', 'MMC.'];
+function quoteName(n) {
+  n = String(n || '').replace(/\s+/g, ' ').trim(); if (!n) return n;
+  if (/[“”"«»„]|''/.test(n)) return n;
+  const fs = n.match(/^(f\s*\/\s*ş\.?)\s+(.+)$/i); if (fs) return `${fs[1]} “${fs[2]}”`;
+  const forms = [...LEGAL_FORMS].sort((a, b) => b.length - a.length);
+  for (const f of forms) { const esc = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const m = n.match(new RegExp(`^(.+?)[\\s,]+(${esc})$`, 'i'));
+    if (m) return `“${m[1]}” ${m[2]}`; }
+  return `“${n}”`;
+}
 // müştəri kartından şablon sahələri
 function buyerFields(c) {
   c = c || {};
-  const name = c.doc_name || c.name || '';
+  const name = quoteName(c.doc_name || c.name || '');
   const pos = c.signer_pos || 'Direktor';
   return {
     b_name: name, b_name_gen: c.doc_name_gen || genitive(name), b_voen: c.voen || '', b_bank: c.bank || '', b_hh: c.iban || '', b_mh: c.corr_account || '',
     b_kod: c.bank_code || '', b_bvoen: c.bank_voen || '', b_swift: c.swift || '', b_addr: c.legal_address || c.address || '',
-    b_pos: pos, b_pos_gen: c.signer_pos_gen || possessive(pos), b_person: c.signer_short || c.signer_full || '', b_person_full: c.signer_full || c.signer_short || '',
+    b_pos: pos, b_pos_gen: c.signer_pos_gen || possessive(pos), b_person: c.signer_full || c.signer_short || '', b_person_full: c.signer_full || c.signer_short || '',
   };
 }
 function contractFields(ct) {
@@ -73,7 +85,7 @@ function contractFields(ct) {
   const d = ct.contract_date || ct.date;
   return { c_no: ct.no, c_date: dmy(d), ...dateParts(d, 'c') };
 }
-if (typeof module !== 'undefined') module.exports = { docRows, buyerFields, contractFields, dateParts, dmy, genitive, possessive, ordSuf, docMoneyWords };
+if (typeof module !== 'undefined') module.exports = { quoteName, docRows, buyerFields, contractFields, dateParts, dmy, genitive, possessive, ordSuf, docMoneyWords };
 // müqavilə/sənəd növü: 'mal' | 'xidmet' | 'qarisiq' — sətirlərin növünə görə təklif
 const KIND_TXT = {
   mal: { title: 'Malların alqı-satqısı haqqında', subj_gen: 'malların', col_name: 'Malın adı', akt: 'İcraçı tərəfindən aşağıda qeyd olunan mallar təchiz edilmiş və Sifarişçiyə təhvil verilmişdir',
