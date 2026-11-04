@@ -4,11 +4,11 @@
    A: { fontR, fontB (base64 TTF), logo:{data,w,h}, img:{key:{data,w,h,fmt}}, seal:{data,w,h}|null } */
 const OFFER_TXT = {
   az: { title: 'Qiymət təklifi', to: 'Kimə', cols: ['Malın adı', 'Miqdar', 'Vahid', 'Qiymət/{cur}'], unit: 'əd', terms_h: 'Şərtlər', req_h: 'Rekvizitlər',
-    dir: 'Direktor', name: 'Ruslan Bəşirov', seal: 'M.Y.', page: 'Səhifə',
+    dir: 'Direktor', name: 'Ruslan Bəşirov Aşır oğlu', seal: 'M.Y.', page: 'Səhifə',
     terms: ['Zəmanət {warranty}', 'Çatdırılma müddəti {delivery}', 'Çatdırılma yeri: {place}', '{vat}', 'Ödəniş şərti: {payment}', 'Qiymət təklifi {until} tarixinədək qüvvədədir'],
     vat_in: 'Qiymətlərə ƏDV daxildir', vat_ex: 'Qiymətlərə ƏDV daxil deyil', d_warranty: '1 ildir', d_delivery: '15 iş günüdür', d_payment: 'Razılaşma yolu ilə', d_place: 'Bakı şəhəri' },
   en: { title: 'Proforma Invoice', to: 'To', cols: ['Description', 'Quantity', 'Unit', 'Unit price ({cur})'], unit: 'pcs', terms_h: 'Terms', req_h: 'Bank details',
-    dir: 'Director', name: 'Ruslan Bashirov', seal: 'Stamp', page: 'Page',
+    dir: 'Director', name: 'Ruslan Bashirov Ashir oglu', seal: 'Stamp', page: 'Page',
     terms: ['Warranty {warranty}', 'Delivery time {delivery}', 'Delivery place: {place}', '{vat}', 'Payment terms: {payment}', 'Valid until {until}'],
     vat_in: 'VAT 18% included in prices', vat_ex: 'VAT 18% not included in prices', d_warranty: '1 year', d_delivery: '15 working days', d_payment: 'by agreement', d_place: 'Baku' },
 };

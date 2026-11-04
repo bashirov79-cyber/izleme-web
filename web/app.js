@@ -1899,7 +1899,7 @@ const loadOfferLibs = () => offerLibs ||= (async () => {
   const js = src => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error('PDF modulu yüklənmədi, internetinizi yoxlayın')); document.head.append(s); });
   const b64 = async url => { const r = await fetch(url); if (!r.ok) throw new Error('Fayl yüklənmədi: ' + url); const u = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
   if (!window.jspdf) await js('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-  if (typeof buildOfferPDF === 'undefined') await js('offerpdf.js?v=4');
+  if (typeof buildOfferPDF === 'undefined') await js('offerpdf.js?v=5');
   const F = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/noto-sans@0.2.3/';
   const [fontR, fontB, logo] = await Promise.all([b64(F + 'NotoSans_400Regular.ttf'), b64(F + 'NotoSans_700Bold.ttf'), b64('teklif-logo.png')]);
   return { fontR, fontB, logo: { data: 'data:image/png;base64,' + logo, w: 480, h: 280 } };
@@ -1952,7 +1952,7 @@ const loadDocLibs = () => docLibs ||= (async () => {
   if (!window.PizZip) await js('https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.min.js');
   if (!window.docxtemplater) await js('https://cdn.jsdelivr.net/npm/docxtemplater@3.47.4/build/docxtemplater.js');
   if (typeof contractTexts === 'undefined') await js('docdata.js?v=3');
-  if (typeof DOCX_DOCS === 'undefined') await js('sablonlar.js?v=3');
+  if (typeof DOCX_DOCS === 'undefined') await js('sablonlar.js?v=4');
 })().catch(e => { docLibs = null; throw e; });
 let pdfLibs = null;
 const loadPdfLibs = () => pdfLibs ||= (async () => {
