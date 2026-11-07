@@ -2451,3 +2451,19 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   setInterval(check, 3 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
 })();
+
+// Rəqəm xanalarında «0»: xanaya basanda sıfır silinir, yazılan rəqəm təmiz düşür; heç nə yazılmasa, sıfır geri qayıdır
+document.addEventListener('focusin', e => {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement) || el.readOnly || el.disabled) return;
+  if (!(el.type === 'number' || el.inputMode === 'decimal' || el.inputMode === 'numeric')) return;
+  const v = el.value.trim().replace(',', '.');
+  if (v !== '' && Number(v) === 0) { el.dataset.zero = el.value; el.value = ''; }
+});
+document.addEventListener('focusout', e => {
+  const el = e.target;
+  if (el instanceof HTMLInputElement && el.dataset.zero !== undefined) {
+    if (el.value.trim() === '') el.value = el.dataset.zero;
+    delete el.dataset.zero;
+  }
+});
