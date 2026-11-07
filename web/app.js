@@ -69,7 +69,8 @@ const STOCK = {
   qirmizi: ['Azalır', 't-red', 'var(--red-bar)'],
   bitib_tecili: ['BİTİB', 't-urgent', 'var(--yellow)'],
   bitib: ['Bitib', 't-grey', '#A9B4BF'],
-  menfi: ['Mənfi qalıq', 't-warn', 'var(--warn)']
+  menfi: ['Mənfi qalıq', 't-warn', 'var(--warn)'],
+  xidmet: ['Xidmət', 't-blue', '#A9B4BF']
 };
 const MOVE = { baslangic: 'Başlanğıc qalıq', medaxil: 'Mədaxil', satis: 'Satış', qaytarma_alici: 'Alıcıdan qaytarma', qaytarma_tedarukcu: 'Tədarükçüyə qaytarma', duzelis: 'Düzəliş' };
 const LEDGER = { kohne: 'Köhnə borc', baslangic: 'Başlanğıc saldo', satis: 'Satış', odenis: 'Ödəniş', duzelis: 'Düzəliş', alis: 'Alış (tədarükçüdən)', tediye: 'Tədarükçüyə ödəniş' };
@@ -707,7 +708,7 @@ async function viewStock(params) {
     var: x => x.qty > 0, qirmizi: x => x.status === 'qirmizi', bitib_tecili: x => x.status === 'bitib_tecili',
     menfi: x => x.status === 'menfi', yoxla: x => x.needs_check, hamisi: () => true
   }[f] || (() => true);
-  const order = { bitib_tecili: 0, menfi: 1, qirmizi: 2, normal: 3, bitib: 4 };
+  const order = { bitib_tecili: 0, menfi: 1, qirmizi: 2, normal: 3, bitib: 4, xidmet: 5 };
   let rows = p.filter(filt);
   if (q) { const nq = norm(q); rows = withSearch(rows).filter(x => x._s.includes(nq)); }
   if (md1) rows = rows.filter(x => x.last_move && String(x.last_move).slice(0, 10) >= md1);
@@ -745,9 +746,9 @@ async function viewStock(params) {
 }
 function stockRow(x) {
   const urgent = x.status === 'bitib_tecili';
-  const info = x.status === 'bitib_tecili' ? `ANBARDA YOXDUR · son 12 ayda ${qtyf(x.sold_12m)} satılıb` :
+  const info = x.status === 'xidmet' ? `xidmət · qalıq tutulmur${x.sold_12m ? ` · son 12 ayda ${qtyf(x.sold_12m)} dəfə` : ''}` : x.status === 'bitib_tecili' ? `ANBARDA YOXDUR · son 12 ayda ${qtyf(x.sold_12m)} satılıb` :
     `${qtyf(x.qty)} ${esc(x.unit)}${x.base_qty ? ` / son mədaxil ${qtyf(x.base_qty)}` : ''}${x.days_left != null && x.status !== 'normal' ? ` · ~${x.days_left} günə bitər` : ''}`;
-  return `<a class="li ${urgent ? 'urgent' : ''}" href="#mehsul/${x.id}"><span class="m"><span class="t">${esc(x.name)}</span><span class="d">kod ${esc(x.code ?? '—')}${x.article ? ' · ' + esc(x.article) : ''} · ${info}${x.needs_check ? ' · <b>yoxlanılmalı</b>' : ''}</span>${x.status !== 'bitib' && x.status !== 'bitib_tecili' ? stockBar(x) : ''}</span><span class="r">${stockTag(x)}</span></a>`;
+  return `<a class="li ${urgent ? 'urgent' : ''}" href="#mehsul/${x.id}"><span class="m"><span class="t">${esc(x.name)}</span><span class="d">kod ${esc(x.code ?? '—')}${x.article ? ' · ' + esc(x.article) : ''} · ${info}${x.needs_check ? ' · <b>yoxlanılmalı</b>' : ''}</span>${!['bitib', 'bitib_tecili', 'xidmet'].includes(x.status) ? stockBar(x) : ''}</span><span class="r">${stockTag(x)}</span></a>`;
 }
 
 async function viewProduct(id) {
@@ -789,12 +790,12 @@ async function viewProduct(id) {
     <div class="head"><div><h1>${esc(x.name)}</h1><div class="sub">kod ${esc(x.code ?? '—')}${x.article ? ' · artikul ' + esc(x.article) : ''} · ${esc(x.kind)}</div></div>${stockTag(x)}</div>
     ${x.needs_check ? `<div class="warnbox">${esc(x.note || '1C-də bu adla bir neçə məhsul var — qalığı yoxlayın.')}</div>` : ''}
     <div class="kpis">
-      <div class="kpi ${x.status === 'qirmizi' ? 'red' : ''}"><span class="l">Qalıq</span><span class="v">${qtyf(x.qty)} ${esc(x.unit)}</span><span class="s">${x.pct != null ? x.pct + '% son mədaxildən' : ''}</span></div>
+      ${x.status === 'xidmet' ? `<div class="kpi"><span class="l">Növ</span><span class="v">Xidmət</span><span class="s">anbar qalığı tutulmur</span></div>` : `<div class="kpi ${x.status === 'qirmizi' ? 'red' : ''}"><span class="l">Qalıq</span><span class="v">${qtyf(x.qty)} ${esc(x.unit)}</span><span class="s">${x.pct != null ? x.pct + '% son mədaxildən' : ''}</span></div>`}
       <div class="kpi"><span class="l">Alış · ${buys.length} dəfə</span><span class="v">${qtyf(sumq(buys))}</span><span class="s">${lastTxt(buys[0])}</span></div>
       <div class="kpi"><span class="l">Satış · ${sells.length} dəfə</span><span class="v">${qtyf(sumq(sells))}</span><span class="s">${lastTxt(sells[0])}</span></div>
       <div class="kpi"><span class="l">Son 12 ayda satış</span><span class="v">${qtyf(x.sold_12m)}</span><span class="s">${x.days_left != null ? `~${x.days_left} günə bitər` : ''}</span></div>
     </div>
-    <div class="row"><a class="btn p" href="#medaxil?p=${x.id}">+ Mal mədaxili${reorder ? ` (${qtyf(reorder)} lazımdır)` : ''}</a></div>
+    ${x.status === 'xidmet' ? '' : `<div class="row"><a class="btn p" href="#medaxil?p=${x.id}">+ Mal mədaxili${reorder ? ` (${qtyf(reorder)} lazımdır)` : ''}</a></div>`}
     <section class="card tight"><div class="card" style="border:0;padding-bottom:6px"><h2>Hərəkətlər</h2>
       <div class="chips" id="mvf">${[['hamisi', 'Hamısı'], ['alis', 'Alış'], ['satis', 'Satış'], ['qaytarma', 'Qaytarma']].map(([k, l], i) => `<a class="chip ${i ? '' : 'on'}" href="javascript:void 0" data-g="${k}">${l}</a>`).join('')}</div></div>
       <div class="scroll"><table class="t"><thead><tr><th>Tarix</th><th>Növ</th><th>Sənəd</th><th>Kimdən / kimə</th><th class="n">Miqdar</th><th class="n">Qiymət</th><th class="n">Məbləğ</th></tr></thead><tbody>
