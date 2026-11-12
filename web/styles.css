@@ -234,3 +234,4 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
 
 /* sənədlər: filtr sətri */
 .dfilt{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.dfilt .f{margin:0;min-width:150px}.dfilt .dq{flex:1;min-width:220px}
+.oterms div.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);min-width:0}.tchips{display:flex;flex-wrap:wrap;gap:6px}.tchips .chip{height:28px;padding:0 10px;font-size:12.5px;color:var(--ink)}.tchips .chip.on{color:#fff}

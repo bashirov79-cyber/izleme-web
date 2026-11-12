@@ -1701,6 +1701,15 @@ async function viewAccount() {
 
 /* ---------- Qiymət təklifləri (anbar, borc və qaimələrə təsir etmir) ---------- */
 const OFFER_ST = { qaralama: ['Aktiv', 't-ok'], tesdiq: ['Aktiv', 't-ok'], legv: ['Ləğv edilib', 't-grey'] };
+const OFFER_PICK = {
+  az: { warranty: ['1 ildir', '2 ildir', '3 ildir', '6 aydır'], delivery: ['1 iş günüdür', '3 iş günüdür', '7 iş günüdür', '15 iş günüdür', '30 iş günüdür', '45 iş günüdür'],
+    place: ['Bakı şəhəri', 'Sumqayıt şəhəri', 'Gəncə şəhəri'], payment: ['Razılaşma yolu ilə', '100% öncədən', 'Çatdırılmadan sonra 30 gün ərzində', '50% öncədən, 50% çatdırılmadan sonra'] },
+  en: { warranty: ['1 year', '2 years', '3 years', '6 months'], delivery: ['1 working day', '3 working days', '7 working days', '15 working days', '30 working days', '45 working days'],
+    place: ['Baku', 'Sumgait', 'Ganja'], payment: ['by agreement', '100% prepayment', 'within 30 days after delivery', '50% prepayment, 50% after delivery'] } };
+const addDaysISO = (d, n) => { const t = new Date((d || today()) + 'T12:00:00'); t.setDate(t.getDate() + n); return t.toISOString().slice(0, 10); };
+let termCtx = { o: {}, ro: false };
+const termF = (k, label, ph, opts) => { const { o, ro } = termCtx; const v = o[k] || '';
+  return `<div class="f"><span>${label}</span><input class="inp" data-o="${k}" value="${esc(v)}" placeholder="${esc(ph)}" ${ro ? 'readonly' : ''}>${ro ? '' : `<div class="tchips">${opts.map(x => `<button type="button" class="chip ${(v || ph) === x ? 'on' : ''}" data-tk="${k}" data-tv="${esc(x)}">${esc(x)}</button>`).join('')}</div>`}</div>`; };
 const OFFER_PH = { az: { unit: 'əd', d_delivery: '15 iş günüdür', d_payment: 'Razılaşma yolu ilə', d_warranty: '1 ildir', d_place: 'Bakı şəhəri' },
   en: { unit: 'pcs', d_delivery: '15 working days', d_payment: 'by agreement', d_warranty: '1 year', d_place: 'Baku' } };
 const OFFER_DEF = () => ({ id: null, no: null, status: 'qaralama', offer_date: today(), customer_id: null, customer_name: '', lang: 'az', currency: 'AZN', vat_included: true,
@@ -1791,6 +1800,7 @@ async function viewOffer(id, params) {
   }
   function render() {
     const st = OFFER_ST[o.status];
+    termCtx = { o, ro };
     mount('teklifler', back + `
       <div class="head"><div><h1>${o.no ? 'Qiymət təklifi ' + esc(o.no) : 'Yeni qiymət təklifi'}</h1><div class="sub">${o.id ? `<span class="tag ${st[1]}">${st[0]}</span>${o.approved_by ? ` · təsdiq: ${esc(o.approved_by.replace('@medigroup.az', ''))}` : ''} · hazırlayan: ${esc((o.created_by || '').replace('@medigroup.az', ''))}` : 'Nömrə yadda saxlayanda veriləcək'}</div></div>
         <div class="row">${o.id && o.status !== 'legv' ? `<a class="btn" href="#muqavile/yeni?offer=${o.id}">Müqavilə</a><a class="btn" href="#sened-yarat/hf/yeni?offer=${o.id}">Hesab-faktura</a>` : ''}${o.id ? `<a class="btn" href="#teklif/yeni?from=${o.id}">Kopyala</a>` : ''}${o.id && !ro ? '<button class="btn danger" id="cancel">Ləğv et</button>' : ''}</div></div>
@@ -1800,16 +1810,17 @@ async function viewOffer(id, params) {
         <label class="f">Tarix<input class="inp" type="date" data-o="offer_date" value="${o.offer_date}" ${ro ? 'readonly' : ''}></label>
         <label class="f">Dil<select class="inp" data-o="lang" ${ro ? 'disabled' : ''}><option value="az">Azərbaycan — Qiymət təklifi</option><option value="en" ${o.lang === 'en' ? 'selected' : ''}>English — Proforma Invoice</option></select></label>
         <label class="f">Valyuta<select class="inp" data-o="currency" ${ro ? 'disabled' : ''}>${['AZN', 'USD', 'EUR'].map(c => `<option ${o.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+      </div></section>
+      <section class="card"><h2>Şərtlər</h2><div class="note" style="margin-top:-4px">Hazır variantı seçin və ya xanaya özünüz yazın. Boş qalsa, boz yazılan standart düşür.</div><div class="fgrid oterms">
+        ${termF('warranty', 'Zəmanət', L().d_warranty, OFFER_PICK[o.lang === 'en' ? 'en' : 'az'].warranty)}
+        ${termF('delivery', 'Çatdırılma müddəti', L().d_delivery, OFFER_PICK[o.lang === 'en' ? 'en' : 'az'].delivery)}
+        ${termF('place', 'Çatdırılma yeri', L().d_place, OFFER_PICK[o.lang === 'en' ? 'en' : 'az'].place)}
         <label class="f">ƏDV<select class="inp" data-o="vat_included" ${ro ? 'disabled' : ''}><option value="1">Qiymətlərə ƏDV daxildir</option><option value="0" ${o.vat_included ? '' : 'selected'}>ƏDV daxil deyil</option></select></label>
-      </div>
-      <details ${o.warranty || o.delivery || o.place || o.payment || o.extra_terms || Number(o.valid_days) !== 30 ? 'open' : ''}><summary>Şərtlər (boş qalsa, standart yazılır)</summary><div class="fgrid" style="margin-top:10px">
-        <label class="f">Çatdırılma müddəti<input class="inp" data-o="delivery" value="${esc(o.delivery || '')}" placeholder="${L().d_delivery} (anbardadırsa: 1 gündür)" ${ro ? 'readonly' : ''}></label>
-        <label class="f">Ödəniş şərti<input class="inp" data-o="payment" value="${esc(o.payment || '')}" placeholder="${L().d_payment}" ${ro ? 'readonly' : ''}></label>
-        <label class="f">Zəmanət<input class="inp" data-o="warranty" value="${esc(o.warranty || '')}" placeholder="${L().d_warranty}" ${ro ? 'readonly' : ''}></label>
-        <label class="f">Çatdırılma yeri<input class="inp" data-o="place" value="${esc(o.place || '')}" placeholder="${L().d_place}" ${ro ? 'readonly' : ''}></label>
-        <label class="f">Etibarlılıq, gün<input class="inp" data-o="valid_days" inputmode="numeric" value="${esc(o.valid_days)}" ${ro ? 'readonly' : ''}></label>
+        ${termF('payment', 'Ödəniş şərti', L().d_payment, OFFER_PICK[o.lang === 'en' ? 'en' : 'az'].payment)}
+        <div class="f"><span>Qüvvədədir (tarixinədək)</span><input class="inp" type="date" id="o_until" value="${addDaysISO(o.offer_date, Number(o.valid_days) || 30)}" ${ro ? 'readonly' : ''}>
+          ${ro ? '' : `<div class="tchips">${[15, 30, 60, 90, 180].map(d => `<button type="button" class="chip ${Number(o.valid_days) === d ? 'on' : ''}" data-vd="${d}">${d} gün</button>`).join('')}</div>`}</div>
         <label class="f" style="grid-column:1/-1">Əlavə şərtlər (hər sətir ayrıca bənd)<textarea class="inp ta" data-o="extra_terms" rows="2" ${ro ? 'readonly' : ''}>${esc(o.extra_terms || '')}</textarea></label>
-      </div></details></section>
+      </div></section>
       <div id="groups">${groupsHTML()}</div>
       ${ro ? '' : '<div><button type="button" class="btn" id="addg">+ Yeni sorğu (başqa məhsul)</button></div>'}
       <div class="obar">${ro ? '' : '<button class="btn" id="save">Yadda saxla</button>'}
@@ -1830,8 +1841,13 @@ async function viewOffer(id, params) {
     $app.querySelectorAll('[data-o]').forEach(el => el.onchange = () => {
       const k = el.dataset.o; let v = el.value;
       if (k === 'vat_included') v = v === '1'; if (k === 'valid_days') v = parseInt(v) || 30;
-      o[k] = v; mark(); if (k === 'currency' || k === 'lang') render();
+      o[k] = v; mark(); if (k === 'currency' || k === 'lang' || k === 'offer_date') render();
     });
+    $app.querySelectorAll('[data-tk]').forEach(b => b.onclick = () => { o[b.dataset.tk] = b.dataset.tv; mark(); render(); });
+    $app.querySelectorAll('[data-vd]').forEach(b => b.onclick = () => { o.valid_days = +b.dataset.vd; mark(); render(); });
+    const un = document.getElementById('o_until');
+    if (un) un.onchange = () => { if (!un.value) return; const d = Math.round((new Date(un.value + 'T12:00:00') - new Date((o.offer_date || today()) + 'T12:00:00')) / 864e5);
+      if (d < 1) { toast('Qüvvədə olma tarixi təklif tarixindən sonra olmalıdır', true); return render(); } o.valid_days = d; mark(); render(); };
     const cu = document.getElementById('o_cust');
     if (cu) cu.onchange = () => { const c = cust.find(x => norm(x.name) === norm(cu.value)); o.customer_name = cu.value.trim(); o.customer_id = c ? c.id : null; mark(); };
     $app.querySelectorAll('[data-gt]').forEach(el => el.oninput = () => { o.groups[+el.dataset.gt].title = el.value; mark(); });
